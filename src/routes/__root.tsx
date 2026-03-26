@@ -5,6 +5,8 @@ import { Toaster } from '@/components/ui/sonner';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { AppBreadcrumbs } from '@/components/layout/AppBreadcrumbs';
 import { BreadcrumbProvider } from '@/components/layout/BreadcrumbContext';
+import { HeaderActionsProvider } from '@/components/layout/HeaderActionsContext';
+import { useRef } from 'react';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Separator } from '@/components/ui/separator';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -43,27 +45,31 @@ const queryClient = new QueryClient({
 function AppShell() {
   useKeyboardShortcuts();
   useKodiWebSocket();
+  const headerSlotRef = useRef<HTMLDivElement>(null);
 
   return (
     <BreadcrumbProvider>
-      <SidebarProvider defaultOpen={true}>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <AppBreadcrumbs />
-            <div className="ml-auto">
-              <SearchTrigger />
+      <HeaderActionsProvider slotRef={headerSlotRef}>
+        <SidebarProvider defaultOpen={true}>
+          <AppSidebar />
+          <SidebarInset>
+            <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+              <SidebarTrigger className="-ml-1" />
+              <Separator orientation="vertical" className="mr-2 h-4" />
+              <AppBreadcrumbs />
+              <div className="ml-auto flex items-center gap-2">
+                <div ref={headerSlotRef} className="flex items-center gap-2" />
+                <SearchTrigger />
+              </div>
+            </header>
+            <div className="flex-1 overflow-auto">
+              <Outlet />
             </div>
-          </header>
-          <div className="flex-1 overflow-auto">
-            <Outlet />
-          </div>
-          <NowPlaying />
-        </SidebarInset>
-      </SidebarProvider>
-      <GlobalSearch />
+            <NowPlaying />
+          </SidebarInset>
+        </SidebarProvider>
+        <GlobalSearch />
+      </HeaderActionsProvider>
     </BreadcrumbProvider>
   );
 }
