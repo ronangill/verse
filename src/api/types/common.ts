@@ -129,8 +129,23 @@ export interface KodiLimits {
 /**
  * Filter options for Kodi queries
  */
-export interface KodiFilter {
-  field?: string;
-  operator?: 'is' | 'isnot' | 'contains' | 'doesnotcontain' | 'startswith' | 'endswith';
-  value?: string | number | boolean;
+export interface KodiFilterRule {
+  field: string;
+  operator:
+    | 'is'
+    | 'isnot'
+    | 'contains'
+    | 'doesnotcontain'
+    | 'startswith'
+    | 'endswith'
+    | 'greaterthan'
+    | 'lessthan';
+  value: string | number | boolean;
 }
+
+export interface KodiFilterCompound {
+  and?: KodiFilter[];
+  or?: KodiFilter[];
+}
+
+export type KodiFilter = KodiFilterRule | KodiFilterCompound;
