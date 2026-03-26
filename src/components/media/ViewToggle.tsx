@@ -12,7 +12,7 @@ interface ViewToggleProps {
 
 export function ViewToggle({ value, onChange, className }: ViewToggleProps) {
   return (
-    <div className={cn('bg-muted/50 flex items-center gap-1 rounded-lg p-1', className)}>
+    <div className={cn('bg-muted/50 flex items-center gap-0.5 rounded-md p-0.5', className)}>
       <Button
         variant="ghost"
         size="sm"
@@ -20,7 +20,7 @@ export function ViewToggle({ value, onChange, className }: ViewToggleProps) {
           onChange('grid');
         }}
         className={cn(
-          'h-9 gap-2 transition-all',
+          'h-6 gap-1.5 px-2 text-xs transition-all',
           value === 'grid'
             ? 'border-input bg-background text-foreground border shadow-sm'
             : 'text-muted-foreground hover:text-foreground border border-transparent'
@@ -28,7 +28,7 @@ export function ViewToggle({ value, onChange, className }: ViewToggleProps) {
         aria-label="Grid view"
         aria-pressed={value === 'grid'}
       >
-        <Grid3x3 className="h-4 w-4" />
+        <Grid3x3 className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">Grid</span>
       </Button>
       <Button
@@ -38,7 +38,7 @@ export function ViewToggle({ value, onChange, className }: ViewToggleProps) {
           onChange('list');
         }}
         className={cn(
-          'h-9 gap-2 transition-all',
+          'h-6 gap-1.5 px-2 text-xs transition-all',
           value === 'list'
             ? 'border-input bg-background text-foreground border shadow-sm'
             : 'text-muted-foreground hover:text-foreground border border-transparent'
@@ -46,7 +46,7 @@ export function ViewToggle({ value, onChange, className }: ViewToggleProps) {
         aria-label="List view"
         aria-pressed={value === 'list'}
       >
-        <List className="h-4 w-4" />
+        <List className="h-3.5 w-3.5" />
         <span className="hidden sm:inline">List</span>
       </Button>
     </div>

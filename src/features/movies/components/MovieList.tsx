@@ -27,12 +27,24 @@ import { useMovieFilters } from '../hooks/useMovieFilters';
 import { useViewMode } from '@/hooks/useViewMode';
 import { useBreadcrumbs } from '@/components/layout/BreadcrumbContext';
 import { usePlayMovie } from '@/api/hooks/usePlayer';
-import { Search, Loader2, Eye, EyeOff, Play, ArrowUpDown } from 'lucide-react';
+import { Search, Loader2, Eye, EyeOff, Play, ArrowUpDown, SlidersHorizontal } from 'lucide-react';
 import { getPosterUrl } from '@/lib/image-utils';
 import { formatRuntime, formatRating, formatYear } from '@/lib/format';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { useColumnVisibility } from '@/hooks/useColumnVisibility';
+import { usePersistedToggle } from '@/hooks/usePersistedToggle';
+import { ColumnToggle } from '@/components/media/ColumnToggle';
+import { HeaderActions } from '@/components/layout/HeaderActionsContext';
+
+const MOVIE_COLUMNS = [
+  { id: 'year', label: 'Year' },
+  { id: 'genre', label: 'Genre' },
+  { id: 'rating', label: 'Rating' },
+  { id: 'runtime', label: 'Runtime' },
+  { id: 'status', label: 'Status' },
+];
 
 export function MovieList() {
   const { data, isLoading, isError, error, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -40,6 +52,12 @@ export function MovieList() {
 
   const observerTarget = useInfiniteScroll(fetchNextPage, hasNextPage, isFetchingNextPage);
   const [viewMode, setViewMode] = useViewMode('movies', 'list');
+  const {
+    isVisible,
+    toggle: toggleColumn,
+    columns: columnDefs,
+  } = useColumnVisibility('movies', MOVIE_COLUMNS);
+  const [showFilters, toggleFilters] = usePersistedToggle('filters-movies', false);
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 300);
   const playMovie = usePlayMovie();
@@ -50,10 +68,8 @@ export function MovieList() {
   // Get the total count from Kodi's API response
   const kodiTotal = data?.pages[0]?.total;
 
-  const { filters, setFilters, filteredMovies, genres, tags, totalCount } = useMovieFilters(
-    allMovies,
-    kodiTotal
-  );
+  const { filters, setFilters, filteredMovies, genres, tags, totalCount, filteredCount } =
+    useMovieFilters(allMovies, kodiTotal);
 
   const { setItems } = useBreadcrumbs();
 
@@ -109,13 +125,27 @@ export function MovieList() {
 
   return (
     <div className="container space-y-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-end gap-2">
-        <div className="bg-muted/50 flex h-11 items-center rounded-lg border px-3">
-          <p className="text-muted-foreground text-sm">{totalCount.toLocaleString()} movies</p>
+      <HeaderActions>
+        <div className="bg-muted/50 flex h-8 items-center rounded-md border px-2.5">
+          <p className="text-muted-foreground text-xs">
+            {filteredCount === totalCount
+              ? totalCount.toLocaleString()
+              : `${filteredCount.toLocaleString()} / ${totalCount.toLocaleString()}`}{' '}
+            movies
+          </p>
         </div>
+        <div
+          onClick={toggleFilters}
+          className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 ${showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-muted/50 text-muted-foreground'}`}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <span className="text-xs">Filters</span>
+        </div>
+        {viewMode === 'list' && (
+          <ColumnToggle columns={columnDefs} isVisible={isVisible} toggle={toggleColumn} />
+        )}
         <ViewToggle value={viewMode} onChange={setViewMode} className="border" />
-      </div>
+      </HeaderActions>
 
       {/* Content */}
       {filteredMovies.length > 0 ||
@@ -128,97 +158,99 @@ export function MovieList() {
               <Table>
                 <TableHeader>
                   {/* Filters Row */}
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead colSpan={8} className="h-14">
-                      <div className="flex flex-wrap items-center gap-4">
-                        <div className="relative">
-                          <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-                          <Input
-                            type="search"
-                            placeholder="Search movies..."
-                            value={searchInput}
-                            onChange={(e) => {
-                              setSearchInput(e.target.value);
+                  {showFilters && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead colSpan={8} className="h-14">
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div className="relative">
+                            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                            <Input
+                              type="search"
+                              placeholder="Search movies..."
+                              value={searchInput}
+                              onChange={(e) => {
+                                setSearchInput(e.target.value);
+                              }}
+                              className="w-64 pl-8"
+                            />
+                          </div>
+
+                          {genres.length > 0 && (
+                            <Select
+                              value={filters.genre ?? 'all'}
+                              onValueChange={(value) => {
+                                setFilters({
+                                  ...filters,
+                                  genre: value === 'all' ? undefined : value,
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-40">
+                                <SelectValue placeholder="Genre" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Genres</SelectItem>
+                                {genres.map((genre) => (
+                                  <SelectItem key={genre} value={genre}>
+                                    {genre}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
+                          {tags.length > 0 && (
+                            <Select
+                              value={filters.tag ?? 'all'}
+                              onValueChange={(value) => {
+                                setFilters({
+                                  ...filters,
+                                  tag: value === 'all' ? undefined : value,
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-40">
+                                <SelectValue placeholder="Tag" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Tags</SelectItem>
+                                {tags.map((tag) => (
+                                  <SelectItem key={tag} value={tag}>
+                                    {tag}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
+                          <Select
+                            value={
+                              filters.watched === undefined
+                                ? 'all'
+                                : filters.watched
+                                  ? 'true'
+                                  : 'false'
+                            }
+                            onValueChange={(value) => {
+                              setFilters({
+                                ...filters,
+                                watched: value === 'all' ? undefined : value === 'true',
+                              });
                             }}
-                            className="w-64 pl-8"
-                          />
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All</SelectItem>
+                              <SelectItem value="true">Watched</SelectItem>
+                              <SelectItem value="false">Unwatched</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-
-                        {genres.length > 0 && (
-                          <Select
-                            value={filters.genre ?? 'all'}
-                            onValueChange={(value) => {
-                              setFilters({
-                                ...filters,
-                                genre: value === 'all' ? undefined : value,
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="w-40">
-                              <SelectValue placeholder="Genre" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Genres</SelectItem>
-                              {genres.map((genre) => (
-                                <SelectItem key={genre} value={genre}>
-                                  {genre}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-
-                        {tags.length > 0 && (
-                          <Select
-                            value={filters.tag ?? 'all'}
-                            onValueChange={(value) => {
-                              setFilters({
-                                ...filters,
-                                tag: value === 'all' ? undefined : value,
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="w-40">
-                              <SelectValue placeholder="Tag" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">All Tags</SelectItem>
-                              {tags.map((tag) => (
-                                <SelectItem key={tag} value={tag}>
-                                  {tag}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-
-                        <Select
-                          value={
-                            filters.watched === undefined
-                              ? 'all'
-                              : filters.watched
-                                ? 'true'
-                                : 'false'
-                          }
-                          onValueChange={(value) => {
-                            setFilters({
-                              ...filters,
-                              watched: value === 'all' ? undefined : value === 'true',
-                            });
-                          }}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue placeholder="Status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All</SelectItem>
-                            <SelectItem value="true">Watched</SelectItem>
-                            <SelectItem value="false">Unwatched</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </TableHead>
-                  </TableRow>
+                      </TableHead>
+                    </TableRow>
+                  )}
                   {/* Column Headers Row */}
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
@@ -235,35 +267,39 @@ export function MovieList() {
                         <ArrowUpDown className="ml-2 h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="-ml-3"
-                        onClick={() => {
-                          handleSort('year');
-                        }}
-                      >
-                        Year
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>Genre</TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="-ml-3"
-                        onClick={() => {
-                          handleSort('rating');
-                        }}
-                      >
-                        Rating
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>Runtime</TableHead>
-                    <TableHead>Status</TableHead>
+                    {isVisible('year') && (
+                      <TableHead>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-3"
+                          onClick={() => {
+                            handleSort('year');
+                          }}
+                        >
+                          Year
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </TableHead>
+                    )}
+                    {isVisible('genre') && <TableHead>Genre</TableHead>}
+                    {isVisible('rating') && (
+                      <TableHead>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-3"
+                          onClick={() => {
+                            handleSort('rating');
+                          }}
+                        >
+                          Rating
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </TableHead>
+                    )}
+                    {isVisible('runtime') && <TableHead>Runtime</TableHead>}
+                    {isVisible('status') && <TableHead>Status</TableHead>}
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -303,23 +339,25 @@ export function MovieList() {
                             <div className="text-muted-foreground text-sm">{movie.director[0]}</div>
                           )}
                         </TableCell>
-                        <TableCell>{year ? year : '-'}</TableCell>
-                        <TableCell>{genre}</TableCell>
-                        <TableCell>{rating ? rating : '-'}</TableCell>
-                        <TableCell>{runtime ? runtime : '-'}</TableCell>
-                        <TableCell>
-                          {isWatched ? (
-                            <Badge variant="secondary" className="gap-1">
-                              <Eye className="h-3 w-3" />
-                              {movie.playcount}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1">
-                              <EyeOff className="h-3 w-3" />
-                              New
-                            </Badge>
-                          )}
-                        </TableCell>
+                        {isVisible('year') && <TableCell>{year ? year : '-'}</TableCell>}
+                        {isVisible('genre') && <TableCell>{genre}</TableCell>}
+                        {isVisible('rating') && <TableCell>{rating ? rating : '-'}</TableCell>}
+                        {isVisible('runtime') && <TableCell>{runtime ? runtime : '-'}</TableCell>}
+                        {isVisible('status') && (
+                          <TableCell>
+                            {isWatched ? (
+                              <Badge variant="secondary" className="gap-1">
+                                <Eye className="h-3 w-3" />
+                                {movie.playcount}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="gap-1">
+                                <EyeOff className="h-3 w-3" />
+                                New
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -347,81 +385,85 @@ export function MovieList() {
           ) : (
             <>
               {/* Filters for grid view */}
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative">
-                  <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-                  <Input
-                    type="search"
-                    placeholder="Search movies..."
-                    value={searchInput}
-                    onChange={(e) => {
-                      setSearchInput(e.target.value);
+              {showFilters && (
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="relative">
+                    <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                    <Input
+                      type="search"
+                      placeholder="Search movies..."
+                      value={searchInput}
+                      onChange={(e) => {
+                        setSearchInput(e.target.value);
+                      }}
+                      className="w-64 pl-8"
+                    />
+                  </div>
+
+                  {genres.length > 0 && (
+                    <Select
+                      value={filters.genre ?? 'all'}
+                      onValueChange={(value) => {
+                        setFilters({ ...filters, genre: value === 'all' ? undefined : value });
+                      }}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Genre" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Genres</SelectItem>
+                        {genres.map((genre) => (
+                          <SelectItem key={genre} value={genre}>
+                            {genre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {tags.length > 0 && (
+                    <Select
+                      value={filters.tag ?? 'all'}
+                      onValueChange={(value) => {
+                        setFilters({ ...filters, tag: value === 'all' ? undefined : value });
+                      }}
+                    >
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Tag" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Tags</SelectItem>
+                        {tags.map((tag) => (
+                          <SelectItem key={tag} value={tag}>
+                            {tag}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <Select
+                    value={
+                      filters.watched === undefined ? 'all' : filters.watched ? 'true' : 'false'
+                    }
+                    onValueChange={(value) => {
+                      setFilters({
+                        ...filters,
+                        watched: value === 'all' ? undefined : value === 'true',
+                      });
                     }}
-                    className="w-64 pl-8"
-                  />
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="true">Watched</SelectItem>
+                      <SelectItem value="false">Unwatched</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                {genres.length > 0 && (
-                  <Select
-                    value={filters.genre ?? 'all'}
-                    onValueChange={(value) => {
-                      setFilters({ ...filters, genre: value === 'all' ? undefined : value });
-                    }}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Genre" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Genres</SelectItem>
-                      {genres.map((genre) => (
-                        <SelectItem key={genre} value={genre}>
-                          {genre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {tags.length > 0 && (
-                  <Select
-                    value={filters.tag ?? 'all'}
-                    onValueChange={(value) => {
-                      setFilters({ ...filters, tag: value === 'all' ? undefined : value });
-                    }}
-                  >
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Tag" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Tags</SelectItem>
-                      {tags.map((tag) => (
-                        <SelectItem key={tag} value={tag}>
-                          {tag}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                <Select
-                  value={filters.watched === undefined ? 'all' : filters.watched ? 'true' : 'false'}
-                  onValueChange={(value) => {
-                    setFilters({
-                      ...filters,
-                      watched: value === 'all' ? undefined : value === 'true',
-                    });
-                  }}
-                >
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="true">Watched</SelectItem>
-                    <SelectItem value="false">Unwatched</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              )}
 
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8">
                 {filteredMovies.map((movie) => (
