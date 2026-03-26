@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Outlet, useMatches } from '@tanstack/react-router';
-import { Calendar, Star, Tv, Eye } from 'lucide-react';
+import { Calendar, Star, Tv, Eye, ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTVShowDetails } from '@/api/hooks/useTVShowDetails';
 import { useSeasons } from '@/api/hooks/useSeasons';
@@ -156,6 +156,21 @@ export function TVShowDetails() {
                   </Badge>
                 )}
                 {tvshow.mpaa && <Badge variant="outline">{tvshow.mpaa}</Badge>}
+                {tvshow.uniqueid?.imdb && (
+                  <a
+                    href={`https://www.imdb.com/title/${tvshow.uniqueid.imdb}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer gap-1 hover:bg-yellow-500/20"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      IMDb
+                    </Badge>
+                  </a>
+                )}
               </div>
               {/* Progress bar */}
               {totalEpisodes > 0 && (

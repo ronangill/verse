@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { Calendar, Clock, Star, Film, Eye } from 'lucide-react';
+import { Calendar, Clock, Star, Film, Eye, ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMovieDetails } from '@/api/hooks/useMovieDetails';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -152,6 +152,21 @@ export function MovieDetails() {
                   </Badge>
                 )}
                 {movie.mpaa && <Badge variant="outline">{movie.mpaa}</Badge>}
+                {movie.uniqueid?.imdb && (
+                  <a
+                    href={`https://www.imdb.com/title/${movie.uniqueid.imdb}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer gap-1 hover:bg-yellow-500/20"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      IMDb
+                    </Badge>
+                  </a>
+                )}
               </div>
             </div>
 
