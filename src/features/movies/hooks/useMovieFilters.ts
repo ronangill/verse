@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { KodiMovie } from '@/api/types/video';
+import { usePersistedFilters } from '@/hooks/usePersistedFilters';
 
 export interface MovieFilters {
   search: string;
@@ -12,8 +13,9 @@ export interface MovieFilters {
 }
 
 export function useMovieFilters(movies: KodiMovie[], kodiTotal?: number) {
-  const [filters, setFilters] = useState<MovieFilters>({
+  const [filters, setFilters] = usePersistedFilters<MovieFilters>('movies', {
     search: '',
+    watched: false,
     sortBy: 'title',
     sortOrder: 'asc',
   });

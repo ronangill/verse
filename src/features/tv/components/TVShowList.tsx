@@ -25,23 +25,79 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useViewMode } from '@/hooks/useViewMode';
+import { usePersistedFilters } from '@/hooks/usePersistedFilters';
 import { useBreadcrumbs } from '@/components/layout/BreadcrumbContext';
-import { Search, Loader2, ArrowUpDown, Eye, EyeOff, Tv } from 'lucide-react';
+import { HeaderActions } from '@/components/layout/HeaderActionsContext';
+import { Search, Loader2, ArrowUpDown, Eye, EyeOff, Tv, SlidersHorizontal } from 'lucide-react';
 import { getPosterUrl } from '@/lib/image-utils';
 import { formatRating, formatYear } from '@/lib/format';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { useColumnVisibility } from '@/hooks/useColumnVisibility';
+import { usePersistedToggle } from '@/hooks/usePersistedToggle';
+import { ColumnToggle } from '@/components/media/ColumnToggle';
 import type { KodiSort, KodiFilter } from '@/api/types/common';
 
+const TV_COLUMNS = [
+  { id: 'year', label: 'Year' },
+  { id: 'genre', label: 'Genre' },
+  { id: 'rating', label: 'Rating' },
+  { id: 'seasons', label: 'Seasons' },
+  { id: 'episodes', label: 'Episodes' },
+  { id: 'status', label: 'Status' },
+];
+
+interface TVShowFilters {
+  search: string;
+  genre: string;
+  tag: string;
+  watched: string; // 'all' | 'watched' | 'unwatched'
+  sortBy: string;
+  sortOrder: 'asc' | 'desc';
+}
+
 export function TVShowList() {
+  const [filters, setFilters] = usePersistedFilters<TVShowFilters>('tvshows', {
+    search: '',
+    genre: 'all',
+    tag: 'all',
+    watched: 'unwatched',
+    sortBy: 'title',
+    sortOrder: 'asc',
+  });
+
   const [searchInput, setSearchInput] = useState('');
   const searchQuery = useDebounce(searchInput, 300);
-  const [selectedGenre, setSelectedGenre] = useState<string>('all');
-  const [selectedTag, setSelectedTag] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('title');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const selectedGenre = filters.genre;
+  const selectedTag = filters.tag;
+  const selectedWatched = filters.watched;
+  const sortBy = filters.sortBy;
+  const sortOrder = filters.sortOrder;
+
+  const setSelectedGenre = (v: string) => {
+    setFilters((f) => ({ ...f, genre: v }));
+  };
+  const setSelectedTag = (v: string) => {
+    setFilters((f) => ({ ...f, tag: v }));
+  };
+  const setSelectedWatched = (v: string) => {
+    setFilters((f) => ({ ...f, watched: v }));
+  };
+  const setSortBy = (v: string) => {
+    setFilters((f) => ({ ...f, sortBy: v }));
+  };
+  const setSortOrder = (v: 'asc' | 'desc') => {
+    setFilters((f) => ({ ...f, sortOrder: v }));
+  };
+
   const [viewMode, setViewMode] = useViewMode('tvshows', 'list');
+  const {
+    isVisible,
+    toggle: toggleColumn,
+    columns: columnDefs,
+  } = useColumnVisibility('tvshows', TV_COLUMNS);
+  const [showFilters, toggleFilters] = usePersistedToggle('filters-tvshows', false);
 
   const { setItems } = useBreadcrumbs();
 
@@ -58,18 +114,24 @@ export function TVShowList() {
 
   // Build filter object
   let filter: KodiFilter | undefined;
+  const filterRules: KodiFilter[] = [];
+
   if (searchQuery) {
-    filter = {
-      field: 'title',
-      operator: 'contains',
-      value: searchQuery,
-    };
-  } else if (selectedGenre !== 'all') {
-    filter = {
-      field: 'genre',
-      operator: 'contains',
-      value: selectedGenre,
-    };
+    filterRules.push({ field: 'title', operator: 'contains', value: searchQuery });
+  }
+  if (selectedGenre !== 'all') {
+    filterRules.push({ field: 'genre', operator: 'contains', value: selectedGenre });
+  }
+  if (selectedWatched === 'unwatched') {
+    filterRules.push({ field: 'playcount', operator: 'is', value: '0' });
+  } else if (selectedWatched === 'watched') {
+    filterRules.push({ field: 'playcount', operator: 'greaterthan', value: '0' });
+  }
+
+  if (filterRules.length === 1) {
+    filter = filterRules[0];
+  } else if (filterRules.length > 1) {
+    filter = { and: filterRules };
   }
 
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, isError, error } =
@@ -98,9 +160,11 @@ export function TVShowList() {
     return Array.from(allTags).sort();
   }, [tvshows]);
 
-  // Apply client-side tag filter
-  const filteredTVShows =
-    selectedTag === 'all' ? tvshows : tvshows.filter((show) => show.tag?.includes(selectedTag));
+  // Apply client-side tag filter (watched is handled server-side)
+  const filteredTVShows = useMemo(() => {
+    if (selectedTag === 'all') return tvshows;
+    return tvshows.filter((show) => show.tag?.includes(selectedTag));
+  }, [tvshows, selectedTag]);
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -110,6 +174,8 @@ export function TVShowList() {
       setSortOrder('asc');
     }
   };
+
+  const totalCount = data?.pages[0]?.total ?? 0;
 
   if (isLoading) {
     return (
@@ -134,23 +200,36 @@ export function TVShowList() {
     );
   }
 
-  const totalCount = data?.pages[0]?.total ?? 0;
-
   return (
     <div className="container space-y-4 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-end gap-2">
-        <div className="bg-muted/50 flex h-11 items-center rounded-lg border px-3">
-          <p className="text-muted-foreground text-sm">{totalCount.toLocaleString()} TV shows</p>
+      <HeaderActions>
+        <div className="bg-muted/50 flex h-8 items-center rounded-md border px-2.5">
+          <p className="text-muted-foreground text-xs">
+            {selectedTag !== 'all'
+              ? `${filteredTVShows.length.toLocaleString()} / ${totalCount.toLocaleString()}`
+              : totalCount.toLocaleString()}{' '}
+            shows
+          </p>
         </div>
+        <div
+          onClick={toggleFilters}
+          className={`flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 ${showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-muted/50 text-muted-foreground'}`}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          <span className="text-xs">Filters</span>
+        </div>
+        {viewMode === 'list' && (
+          <ColumnToggle columns={columnDefs} isVisible={isVisible} toggle={toggleColumn} />
+        )}
         <ViewToggle value={viewMode} onChange={setViewMode} className="border" />
-      </div>
+      </HeaderActions>
 
       {/* TV Shows Grid/List */}
       {filteredTVShows.length === 0 &&
       !searchInput &&
       selectedGenre === 'all' &&
-      selectedTag === 'all' ? (
+      selectedTag === 'all' &&
+      selectedWatched === 'all' ? (
         <EmptyState title="No TV shows found" description="Your TV show library is empty." />
       ) : (
         <>
@@ -159,54 +238,68 @@ export function TVShowList() {
               <Table>
                 <TableHeader>
                   {/* Filters Row */}
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead colSpan={8} className="h-14">
-                      <div className="flex flex-wrap items-center gap-4">
-                        <div className="relative">
-                          <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-                          <Input
-                            type="search"
-                            placeholder="Search TV shows..."
-                            value={searchInput}
-                            onChange={(e) => {
-                              setSearchInput(e.target.value);
-                            }}
-                            className="w-64 pl-8"
-                          />
-                        </div>
+                  {showFilters && (
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead colSpan={8} className="h-14">
+                        <div className="flex flex-wrap items-center gap-4">
+                          <div className="relative">
+                            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                            <Input
+                              type="search"
+                              placeholder="Search TV shows..."
+                              value={searchInput}
+                              onChange={(e) => {
+                                setSearchInput(e.target.value);
+                              }}
+                              className="w-64 pl-8"
+                            />
+                          </div>
 
-                        <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-                          <SelectTrigger className="w-40">
-                            <SelectValue placeholder="Genre" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Genres</SelectItem>
-                            {genres.map((genre) => (
-                              <SelectItem key={genre} value={genre}>
-                                {genre}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        {tags.length > 0 && (
-                          <Select value={selectedTag} onValueChange={setSelectedTag}>
+                          <Select value={selectedGenre} onValueChange={setSelectedGenre}>
                             <SelectTrigger className="w-40">
-                              <SelectValue placeholder="Tag" />
+                              <SelectValue placeholder="Genre" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="all">All Tags</SelectItem>
-                              {tags.map((tag) => (
-                                <SelectItem key={tag} value={tag}>
-                                  {tag}
+                              <SelectItem value="all">All Genres</SelectItem>
+                              {genres.map((genre) => (
+                                <SelectItem key={genre} value={genre}>
+                                  {genre}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                        )}
-                      </div>
-                    </TableHead>
-                  </TableRow>
+
+                          {tags.length > 0 && (
+                            <Select value={selectedTag} onValueChange={setSelectedTag}>
+                              <SelectTrigger className="w-40">
+                                <SelectValue placeholder="Tag" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Tags</SelectItem>
+                                {tags.map((tag) => (
+                                  <SelectItem key={tag} value={tag}>
+                                    {tag}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+
+                          <Select value={selectedWatched} onValueChange={setSelectedWatched}>
+                            <SelectTrigger className="w-40">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Shows</SelectItem>
+                              <SelectItem value="unwatched">Unwatched</SelectItem>
+
+                              <SelectItem value="watched">Watched</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </TableHead>
+                    </TableRow>
+                  )}
                   {/* Column Headers Row */}
                   <TableRow>
                     <TableHead className="w-12"></TableHead>
@@ -223,36 +316,40 @@ export function TVShowList() {
                         <ArrowUpDown className="ml-2 h-4 w-4" />
                       </Button>
                     </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="-ml-3"
-                        onClick={() => {
-                          handleSort('year');
-                        }}
-                      >
-                        Year
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>Genre</TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="-ml-3"
-                        onClick={() => {
-                          handleSort('rating');
-                        }}
-                      >
-                        Rating
-                        <ArrowUpDown className="ml-2 h-4 w-4" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>Seasons</TableHead>
-                    <TableHead>Episodes</TableHead>
-                    <TableHead>Status</TableHead>
+                    {isVisible('year') && (
+                      <TableHead>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-3"
+                          onClick={() => {
+                            handleSort('year');
+                          }}
+                        >
+                          Year
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </TableHead>
+                    )}
+                    {isVisible('genre') && <TableHead>Genre</TableHead>}
+                    {isVisible('rating') && (
+                      <TableHead>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-3"
+                          onClick={() => {
+                            handleSort('rating');
+                          }}
+                        >
+                          Rating
+                          <ArrowUpDown className="ml-2 h-4 w-4" />
+                        </Button>
+                      </TableHead>
+                    )}
+                    {isVisible('seasons') && <TableHead>Seasons</TableHead>}
+                    {isVisible('episodes') && <TableHead>Episodes</TableHead>}
+                    {isVisible('status') && <TableHead>Status</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -293,31 +390,35 @@ export function TVShowList() {
                             <div className="text-muted-foreground text-sm">{tvshow.studio[0]}</div>
                           )}
                         </TableCell>
-                        <TableCell>{year ? year : '-'}</TableCell>
-                        <TableCell>{genre}</TableCell>
-                        <TableCell>{rating ?? '-'}</TableCell>
-                        <TableCell>{tvshow.season ?? '-'}</TableCell>
-                        <TableCell>
-                          {watchedEpisodes}/{totalEpisodes}
-                        </TableCell>
-                        <TableCell>
-                          {isFullyWatched ? (
-                            <Badge variant="secondary" className="gap-1">
-                              <Eye className="h-3 w-3" />
-                              Complete
-                            </Badge>
-                          ) : isPartiallyWatched ? (
-                            <Badge variant="outline" className="gap-1">
-                              <Tv className="h-3 w-3" />
-                              In Progress
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="gap-1">
-                              <EyeOff className="h-3 w-3" />
-                              New
-                            </Badge>
-                          )}
-                        </TableCell>
+                        {isVisible('year') && <TableCell>{year ? year : '-'}</TableCell>}
+                        {isVisible('genre') && <TableCell>{genre}</TableCell>}
+                        {isVisible('rating') && <TableCell>{rating ?? '-'}</TableCell>}
+                        {isVisible('seasons') && <TableCell>{tvshow.season ?? '-'}</TableCell>}
+                        {isVisible('episodes') && (
+                          <TableCell>
+                            {watchedEpisodes}/{totalEpisodes}
+                          </TableCell>
+                        )}
+                        {isVisible('status') && (
+                          <TableCell>
+                            {isFullyWatched ? (
+                              <Badge variant="secondary" className="gap-1">
+                                <Eye className="h-3 w-3" />
+                                Complete
+                              </Badge>
+                            ) : isPartiallyWatched ? (
+                              <Badge variant="outline" className="gap-1">
+                                <Tv className="h-3 w-3" />
+                                In Progress
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="gap-1">
+                                <EyeOff className="h-3 w-3" />
+                                New
+                              </Badge>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -334,50 +435,64 @@ export function TVShowList() {
           ) : (
             <>
               {/* Filters for grid view */}
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative">
-                  <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-                  <Input
-                    type="search"
-                    placeholder="Search TV shows..."
-                    value={searchInput}
-                    onChange={(e) => {
-                      setSearchInput(e.target.value);
-                    }}
-                    className="w-64 pl-8"
-                  />
-                </div>
+              {showFilters && (
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="relative">
+                    <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                    <Input
+                      type="search"
+                      placeholder="Search TV shows..."
+                      value={searchInput}
+                      onChange={(e) => {
+                        setSearchInput(e.target.value);
+                      }}
+                      className="w-64 pl-8"
+                    />
+                  </div>
 
-                <Select value={selectedGenre} onValueChange={setSelectedGenre}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue placeholder="Genre" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Genres</SelectItem>
-                    {genres.map((genre) => (
-                      <SelectItem key={genre} value={genre}>
-                        {genre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {tags.length > 0 && (
-                  <Select value={selectedTag} onValueChange={setSelectedTag}>
+                  <Select value={selectedGenre} onValueChange={setSelectedGenre}>
                     <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Tag" />
+                      <SelectValue placeholder="Genre" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Tags</SelectItem>
-                      {tags.map((tag) => (
-                        <SelectItem key={tag} value={tag}>
-                          {tag}
+                      <SelectItem value="all">All Genres</SelectItem>
+                      {genres.map((genre) => (
+                        <SelectItem key={genre} value={genre}>
+                          {genre}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                )}
-              </div>
+
+                  {tags.length > 0 && (
+                    <Select value={selectedTag} onValueChange={setSelectedTag}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Tag" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Tags</SelectItem>
+                        {tags.map((tag) => (
+                          <SelectItem key={tag} value={tag}>
+                            {tag}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  <Select value={selectedWatched} onValueChange={setSelectedWatched}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Shows</SelectItem>
+                      <SelectItem value="unwatched">Unwatched</SelectItem>
+                      <SelectItem value="inprogress">In Progress</SelectItem>
+                      <SelectItem value="watched">Watched</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8">
                 {filteredTVShows.map((tvshow) => (

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { KodiSong } from '@/api/types/audio';
 import { joinArray } from '@/lib/format';
+import { usePersistedFilters } from '@/hooks/usePersistedFilters';
 
 export interface SongFilters {
   search: string;
@@ -10,7 +11,7 @@ export interface SongFilters {
 }
 
 export function useSongFilters(songs: KodiSong[], kodiTotal?: number) {
-  const [filters, setFilters] = useState<SongFilters>({
+  const [filters, setFilters] = usePersistedFilters<SongFilters>('songs', {
     search: '',
     sortBy: 'title',
     sortOrder: 'asc',
