@@ -33,5 +33,13 @@ export default tseslint.config(
       ],
       '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
     },
+  },
+  // TanStack Router route files export both a component and a Route constant.
+  // shadcn/ui components export variant helpers alongside components.
+  {
+    files: ['src/routes/**/*.{ts,tsx}', 'src/components/ui/**/*.{ts,tsx}', 'src/components/layout/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   }
 );
