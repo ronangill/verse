@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { Calendar, Clock, Star, Film, Eye, ExternalLink } from 'lucide-react';
+import { Calendar, Clock, Star, Film, Eye, EyeOff, ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMovieDetails } from '@/api/hooks/useMovieDetails';
+import { useSetMovieWatched } from '@/api/hooks/usePlayback';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MediaImage } from '@/components/media/MediaImage';
@@ -35,6 +37,7 @@ export function MovieDetails() {
   const queryClient = useQueryClient();
 
   const { data: movie, isLoading, isError, error } = useMovieDetails(movieIdNum);
+  const setWatchedMutation = useSetMovieWatched();
   const { setItems } = useBreadcrumbs();
 
   // Dialog states
@@ -83,6 +86,13 @@ export function MovieDetails() {
 
   const fanartUrl = getFanartUrl(movie.art);
   const posterUrl = getPosterUrl(movie.art);
+  const isWatched = movie.playcount !== undefined && movie.playcount > 0;
+  const handleToggleWatched = () => {
+    setWatchedMutation.mutate({
+      movieid: movie.movieid,
+      playcount: isWatched ? 0 : 1,
+    });
+  };
   const directors = joinArray(movie.director);
   const writers = joinArray(movie.writer);
   const studios = joinArray(movie.studio);
@@ -164,6 +174,21 @@ export function MovieDetails() {
                     >
                       <ExternalLink className="h-3 w-3" />
                       IMDb
+                    </Badge>
+                  </a>
+                )}
+                {movie.uniqueid?.tmdb && (
+                  <a
+                    href={`https://dev.gillsoft.org/radarr/movie/${movie.uniqueid.tmdb}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer gap-1 hover:bg-orange-500/20"
+                    >
+                      <Film className="h-3 w-3" />
+                      Radarr
                     </Badge>
                   </a>
                 )}
@@ -252,9 +277,30 @@ export function MovieDetails() {
                 <div>
                   <span className="text-muted-foreground text-sm">Status</span>
                   <p className="flex items-center gap-2">
-                    <Eye className="h-4 w-4" />
-                    {movie.playcount && movie.playcount > 0 ? 'Watched' : 'Unwatched'}
+                    {isWatched ? (
+                      <>
+                        <Eye className="h-4 w-4" />
+                        Watched
+                      </>
+                    ) : (
+                      <>
+                        <EyeOff className="h-4 w-4" />
+                        Unwatched
+                      </>
+                    )}
                   </p>
+                </div>
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleToggleWatched}
+                    disabled={setWatchedMutation.isPending}
+                    className="gap-2"
+                  >
+                    {isWatched ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {isWatched ? 'Mark Unwatched' : 'Mark Watched'}
+                  </Button>
                 </div>
                 {movie.lastplayed && (
                   <div>
