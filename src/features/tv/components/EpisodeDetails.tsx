@@ -1,7 +1,8 @@
 import { useParams, Link } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { Calendar, Clock, Star, Play, Eye, EyeOff, Tv } from 'lucide-react';
+import { Calendar, Clock, Star, Play, Eye, EyeOff, Tv, ExternalLink } from 'lucide-react';
 import { useEpisodeDetails } from '@/api/hooks/useEpisodes';
+import { useTVShowDetails } from '@/api/hooks/useTVShowDetails';
 import { usePlayEpisode, useSetEpisodeWatched } from '@/api/hooks/usePlayback';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MediaImage } from '@/components/media/MediaImage';
 import { useBreadcrumbs } from '@/components/layout/BreadcrumbContext';
 import { getThumbnailUrl, getFanartUrl, getImageUrl } from '@/lib/image-utils';
-import { formatRuntime } from '@/lib/format';
+import { formatRuntime, slugify } from '@/lib/format';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { CastGrid } from '@/components/media/CastGrid';
 
@@ -20,6 +21,7 @@ export function EpisodeDetails() {
   const episodeIdNum = parseInt(episodeId ?? '0', 10);
 
   const { data: episode, isLoading, isError, error } = useEpisodeDetails(episodeIdNum);
+  const { data: tvshow } = useTVShowDetails(episode?.tvshowid ?? 0);
   const playMutation = usePlayEpisode();
   const setWatchedMutation = useSetEpisodeWatched();
   const { setItems } = useBreadcrumbs();
@@ -80,6 +82,7 @@ export function EpisodeDetails() {
   const fanartUrl = getImageUrl(tvshowFanart) ?? getFanartUrl(episode.art);
   const isWatched = episode.playcount !== undefined && episode.playcount > 0;
   const hasResume = Boolean(episode.resume?.position && episode.resume.position > 0);
+  const imdbId = episode.uniqueid?.imdb ?? tvshow?.uniqueid?.imdb;
 
   const episodeCode = `S${String(episode.season).padStart(2, '0')}E${String(episode.episode).padStart(2, '0')}`;
   const directors = episode.director?.join(', ');
@@ -172,6 +175,33 @@ export function EpisodeDetails() {
                   </Badge>
                 )}
                 {isWatched && <Badge variant="outline">Watched</Badge>}
+                {imdbId && (
+                  <a
+                    href={`https://www.imdb.com/title/${imdbId}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer gap-1 hover:bg-yellow-500/20"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      IMDb
+                    </Badge>
+                  </a>
+                )}
+                {episode.showtitle && (
+                  <a
+                    href={`https://dev.gillsoft.org/nzbdrone/series/${slugify(episode.showtitle)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Badge variant="outline" className="cursor-pointer gap-1 hover:bg-blue-500/20">
+                      <Tv className="h-3 w-3" />
+                      nzbdrone
+                    </Badge>
+                  </a>
+                )}
               </div>
             </div>
 

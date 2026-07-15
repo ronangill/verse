@@ -1,6 +1,6 @@
 import { useParams } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { Calendar, Star, Tv } from 'lucide-react';
+import { Calendar, Star, Tv, ExternalLink } from 'lucide-react';
 import { useTVShowDetails } from '@/api/hooks/useTVShowDetails';
 import { useSeasons } from '@/api/hooks/useSeasons';
 import { useEpisodesBySeason } from '@/api/hooks/useEpisodes';
@@ -11,6 +11,7 @@ import { MediaImage } from '@/components/media/MediaImage';
 import { EpisodeList } from './EpisodeList';
 import { useBreadcrumbs } from '@/components/layout/BreadcrumbContext';
 import { getFanartUrl, getPosterUrl } from '@/lib/image-utils';
+import { slugify } from '@/lib/format';
 import { ErrorState } from '@/components/ui/ErrorState';
 
 export function SeasonDetails() {
@@ -156,6 +157,31 @@ export function SeasonDetails() {
                   </Badge>
                 )}
                 <Badge variant="outline">{totalEpisodes} episodes</Badge>
+                {tvshow.uniqueid?.imdb && (
+                  <a
+                    href={`https://www.imdb.com/title/${tvshow.uniqueid.imdb}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer gap-1 hover:bg-yellow-500/20"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      IMDb
+                    </Badge>
+                  </a>
+                )}
+                <a
+                  href={`https://dev.gillsoft.org/nzbdrone/series/${slugify(tvshow.title)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Badge variant="outline" className="cursor-pointer gap-1 hover:bg-blue-500/20">
+                    <Tv className="h-3 w-3" />
+                    nzbdrone
+                  </Badge>
+                </a>
               </div>
               {/* Progress bar */}
               {totalEpisodes > 0 && (

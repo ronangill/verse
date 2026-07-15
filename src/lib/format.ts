@@ -275,3 +275,26 @@ export function formatBroadcastTime(starttime?: string, endtime?: string): strin
 export function formatDuration(seconds?: number): string {
   return formatTime(seconds);
 }
+
+/**
+ * Convert a title to a URL-safe slug (Sonarr's series slug convention,
+ * which inherits TVDB's title-slug rules).
+ * Strips diacritics, expands "&" to "and", drops apostrophes/exclamation/question marks,
+ * then replaces any other run of non-alphanumeric characters with a single dash.
+ * @example slugify("Daredevil: Born Again") -> "daredevil-born-again"
+ * @example slugify("M.I.A.") -> "m-i-a"
+ * @example slugify("Tom & Jerry") -> "tom-and-jerry"
+ * @example slugify("It's a Wonderful Life") -> "its-a-wonderful-life"
+ * @example slugify("Pokémon") -> "pokemon"
+ */
+export function slugify(text?: string): string {
+  if (!text) return '';
+  return text
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/['!?]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}

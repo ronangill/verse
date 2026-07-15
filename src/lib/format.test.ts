@@ -12,6 +12,7 @@ import {
   pluralize,
   truncate,
   formatEpisodeNumber,
+  slugify,
 } from './format';
 
 describe('formatRuntime', () => {
@@ -266,5 +267,48 @@ describe('formatEpisodeNumber', () => {
 
   it('handles season 0 (specials)', () => {
     expect(formatEpisodeNumber(0, 1)).toBe('S00E01');
+  });
+});
+
+describe('slugify', () => {
+  it('matches the user-confirmed Sonarr example', () => {
+    expect(slugify('Daredevil: Born Again')).toBe('daredevil-born-again');
+  });
+
+  it('replaces internal punctuation with dashes (M.I.A. case)', () => {
+    expect(slugify('M.I.A.')).toBe('m-i-a');
+  });
+
+  it('expands "&" to "and" with spaces around it (TVDB convention)', () => {
+    expect(slugify('Tom & Jerry')).toBe('tom-and-jerry');
+    expect(slugify('Tom&Jerry')).toBe('tom-and-jerry');
+  });
+
+  it("handles & combined with apostrophe (Georgie & Mandy's case)", () => {
+    expect(slugify("Georgie & Mandy's First Marriage")).toBe('georgie-and-mandys-first-marriage');
+  });
+
+  it('strips diacritics', () => {
+    expect(slugify('Pokémon')).toBe('pokemon');
+  });
+
+  it('drops apostrophes without leaving gaps', () => {
+    expect(slugify("It's a Wonderful Life")).toBe('its-a-wonderful-life');
+  });
+
+  it('collapses runs of separators into a single dash', () => {
+    expect(slugify('  Hello   --  World  ')).toBe('hello-world');
+  });
+
+  it('returns empty string for undefined input', () => {
+    expect(slugify(undefined)).toBe('');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(slugify('')).toBe('');
+  });
+
+  it('handles a title with only punctuation gracefully', () => {
+    expect(slugify('!!!')).toBe('');
   });
 });

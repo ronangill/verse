@@ -13,7 +13,7 @@ import { MediaImage } from '@/components/media/MediaImage';
 import { SeasonList } from './SeasonList';
 import { useBreadcrumbs } from '@/components/layout/BreadcrumbContext';
 import { getFanartUrl, getPosterUrl, getImageUrl } from '@/lib/image-utils';
-import { joinArray } from '@/lib/format';
+import { joinArray, slugify } from '@/lib/format';
 import { useUpdateTVShowArtwork } from '@/api/hooks/useMovieArtwork';
 import { FetchArtworkDialog } from '@/components/artwork/FetchArtworkDialog';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -171,6 +171,16 @@ export function TVShowDetails() {
                     </Badge>
                   </a>
                 )}
+                <a
+                  href={`https://dev.gillsoft.org/nzbdrone/series/${slugify(tvshow.title)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Badge variant="outline" className="cursor-pointer gap-1 hover:bg-blue-500/20">
+                    <Tv className="h-3 w-3" />
+                    nzbdrone
+                  </Badge>
+                </a>
               </div>
               {/* Progress bar */}
               {totalEpisodes > 0 && (
